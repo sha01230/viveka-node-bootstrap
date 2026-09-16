@@ -17,13 +17,21 @@ function Write-JsonUtf8([string]$Path, $Object) {
 function Ensure-WindowsCapability([string]$Pattern) {
   $cap = Get-WindowsCapability -Online | Where-Object Name -Like $Pattern | Select-Object -First 1
   if (-not $cap) { throw "Windows capability unavailable: $Pattern" }
-  if ($cap.State -ne 'Installed') { Add-WindowsCapability -Online -Name $cap.Name | Out-Null }
+  if ($cap.State -ne 'Installed') {
+    $result = Add-WindowsCapability -Online -Name $cap.Name
+    if (-not $result) { throw "Windows capability installation returned no result: $($cap.Name)" }
+  }
+  $post = Get-WindowsCapability -Online -Name $cap.Name
+  if (-not $post -or $post.State -ne 'Installed') { throw "Windows capability failed to reach Installed state: $($cap.Name)" }
 }
 try {
   New-Item -ItemType Directory -Force -Path $NodeRoot,$IdentityDir | Out-Null
   Start-Transcript -Path $LogOut -Append | Out-Null
   $TranscriptStarted = $true
-  Step 'OpenSSH server substrate'  Ensure-WindowsCapability 'OpenSSH.Server*'
+  Step 'OpenSSH server substrate'
+  Ensure-WindowsCapability 'OpenSSH.Server*'
+  $sshd = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
+  if (-not $sshd) { throw 'OpenSSH Server capability is installed but sshd service was not created' }
   Set-Service sshd -StartupType Automatic
   Start-Service sshd
   if (-not (Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue)) {
