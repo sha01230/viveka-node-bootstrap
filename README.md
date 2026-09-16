@@ -6,7 +6,7 @@ Public, auditable Windows bootstrap for preparing a host for later VIVEKA enroll
 
 `PUBLIC BOOTSTRAP -> AUTHENTICATED ENROLLMENT -> PRIVATE RUNTIME`
 
-Downloading or running this installer does **not** enroll or activate a node. It creates a local Ed25519 identity, enables Windows OpenSSH, records observed host facts, and writes a `PENDING` enrollment request with a human-verifiable pairing code.
+Downloading or running this installer does **not** enroll or activate a node. It creates a local ECDSA P-256 enrollment identity using Windows CNG, protects the private key material with machine-scoped DPAPI plus restricted ACLs, enables Windows OpenSSH Server, records observed host facts, and writes a `PENDING` enrollment request with a human-verifiable pairing code.
 
 The private key remains on the host. No Reality Lab source code, GitHub credential, enrollment token, global password, or reusable secret is embedded in this repository or installer.
 
