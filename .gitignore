@@ -1,0 +1,4 @@
+VIVEKA_NODE_SETUP.exe
+viveka_node_setup.sed
+.pytest_cache/
+__pycache__/
