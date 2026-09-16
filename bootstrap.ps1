@@ -14,24 +14,49 @@ function Step([string]$Message) { Write-Host "`n=== $Message ===" }
 function Write-JsonUtf8([string]$Path, $Object) {
   [IO.File]::WriteAllText($Path, (($Object | ConvertTo-Json -Depth 8) + [Environment]::NewLine), $Utf8)
 }
-function Ensure-WindowsCapability([string]$Pattern) {
-  $cap = Get-WindowsCapability -Online | Where-Object Name -Like $Pattern | Select-Object -First 1
-  if (-not $cap) { throw "Windows capability unavailable: $Pattern" }
-  if ($cap.State -ne 'Installed') {
-    $result = Add-WindowsCapability -Online -Name $cap.Name
-    if (-not $result) { throw "Windows capability installation returned no result: $($cap.Name)" }
+function Ensure-OpenSSHServer {
+  $existing = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
+  if ($existing) { return 'EXISTING' }
+
+  $cap = Get-WindowsCapability -Online | Where-Object Name -Like 'OpenSSH.Server*' | Select-Object -First 1
+  if ($cap) {
+    if ($cap.State -ne 'Installed') {
+      try { Add-WindowsCapability -Online -Name $cap.Name | Out-Null } catch { Write-Host ('FoD install failed, using bundled MSI: ' + $_.Exception.Message) }
+    }
+    $existing = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
+    if ($existing) { return 'FOD' }
   }
-  $post = Get-WindowsCapability -Online -Name $cap.Name
-  if (-not $post -or $post.State -ne 'Installed') { throw "Windows capability failed to reach Installed state: $($cap.Name)" }
+
+  $msi = Join-Path $PSScriptRoot 'OpenSSH-Win64-v9.8.3.0.msi'
+  if (-not (Test-Path $msi)) { throw "Bundled OpenSSH MSI missing: $msi" }
+  $expected = 'C8A8C7E21136A099665C2FAD9ACCB41152D129466B719EA71678BAB665E03389'
+  $actual = (Get-FileHash $msi -Algorithm SHA256).Hash.ToUpperInvariant()
+  if ($actual -ne $expected) { throw "Bundled OpenSSH MSI hash mismatch: $actual" }
+  $sig = Get-AuthenticodeSignature $msi
+  if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notlike '*Microsoft Corporation*') {
+    throw "Bundled OpenSSH MSI signature is not valid Microsoft Corporation Authenticode"
+  }
+  $msiLog = Join-Path $NodeRoot 'openssh-msi.log'
+  $args = @('/i', $msi, 'ADDLOCAL=Server', '/qn', '/norestart', '/L*v', $msiLog)
+  $proc = Start-Process msiexec.exe -ArgumentList $args -Wait -PassThru
+  if ($proc.ExitCode -notin 0,3010) { throw "Bundled OpenSSH MSI failed ($($proc.ExitCode)); log: $msiLog" }
+  $existing = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
+  if (-not $existing) {
+    $installScript = 'C:\Program Files\OpenSSH\install-sshd.ps1'
+    if (Test-Path $installScript) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installScript | Out-Null }
+    $existing = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
+  }
+  if (-not $existing) { throw 'OpenSSH MSI completed but sshd service still does not exist' }
+  return 'BUNDLED_MSI'
 }
 try {
   New-Item -ItemType Directory -Force -Path $NodeRoot,$IdentityDir | Out-Null
   Start-Transcript -Path $LogOut -Append | Out-Null
   $TranscriptStarted = $true
   Step 'OpenSSH server substrate'
-  Ensure-WindowsCapability 'OpenSSH.Server*'
-  $sshd = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
-  if (-not $sshd) { throw 'OpenSSH Server capability is installed but sshd service was not created' }
+  $OpenSSHSource = Ensure-OpenSSHServer
+  Write-Host ('OpenSSH source: ' + $OpenSSHSource)
+  $sshd = Get-Service -Name 'sshd' -ErrorAction Stop
   Set-Service sshd -StartupType Automatic
   Start-Service sshd
   if (-not (Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue)) {
