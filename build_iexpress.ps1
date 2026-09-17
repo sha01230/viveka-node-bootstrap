@@ -35,8 +35,8 @@ $lines = @(
 'FILE0=launch.cmd','FILE1=bootstrap.ps1',
 ('FILE2=' + [string]$Manifest.openssh.filename),
 ('FILE3=' + [string]$Manifest.python.filename),
-'FILE4=payload_manifest.json','[SourceFiles]',('SourceFiles0=' + $Here + '\'),
-'[SourceFiles0]','%FILE0%=','%FILE1%=','%FILE2%=','%FILE3%=','%FILE4%='
+'FILE4=payload_manifest.json','FILE5=emit_host_profile.ps1','[SourceFiles]',('SourceFiles0=' + $Here + '\'),
+'[SourceFiles0]','%FILE0%=','%FILE1%=','%FILE2%=','%FILE3%=','%FILE4%=','%FILE5%='
 )
 [IO.File]::WriteAllLines($Sed,$lines,(New-Object Text.ASCIIEncoding))
 if (Test-Path $Out) { Remove-Item $Out -Force }

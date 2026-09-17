@@ -140,15 +140,9 @@ try {
   $PairHex = (($PairHash[0..7] | ForEach-Object { $_.ToString('X2') }) -join '')
   $PairingCode = 'VIVEKA-' + $PairHex.Substring(0,4) + '-' + $PairHex.Substring(4,4) + '-' + $PairHex.Substring(8,4) + '-' + $PairHex.Substring(12,4)
   Step 'Observed host facts'
-  $cs = Get-CimInstance Win32_ComputerSystem
-  $os = Get-CimInstance Win32_OperatingSystem
-  $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-  $gpus = @(Get-CimInstance Win32_VideoController | ForEach-Object {
-    [ordered]@{ name=$_.Name; driver_version=$_.DriverVersion; reported_adapter_ram_bytes=[uint64]$_.AdapterRAM }
-  })
-  $memory = @(Get-CimInstance Win32_PhysicalMemory | ForEach-Object {
-    [ordered]@{ manufacturer=$_.Manufacturer; part_number=(($_.PartNumber -as [string]).Trim()); capacity_bytes=[uint64]$_.Capacity; speed_mts=$_.Speed; form_factor=$_.FormFactor }
-  })
+  $HostProfilePath = Join-Path $PSScriptRoot 'emit_host_profile.ps1'
+  $profile = & $HostProfilePath | ConvertFrom-Json
+  if ($profile.schema -ne 'viveka.node.host_profile.v1') { throw 'Invalid host profile schema' }
   $request = [ordered]@{
     schema = 'viveka.node.enrollment_request.v1'
     state = 'PENDING'
@@ -158,12 +152,8 @@ try {
     identity_algorithm = 'ECDSA_P256_CNG_BLOB_V1'
     identity_fingerprint = $Fingerprint
     public_key_blob_b64 = [Convert]::ToBase64String($PublicBytes)
-    host = [ordered]@{
-      hostname=$(if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { $cs.Name }); vendor=$cs.Manufacturer; model=$cs.Model
-      os=$os.Caption; os_version=$os.Version; architecture=$os.OSArchitecture
-      cpu=$cpu.Name; total_memory_bytes=[uint64]$cs.TotalPhysicalMemory
-      gpus=$gpus; memory_modules=$memory
-    }
+    host_identity = $profile.host_identity
+    host = $profile.host
     authority = [ordered]@{
       enrolled=$false; activated=$false; enrollment_issuer=$false
       note='Public bootstrap creates no VIVEKA authority. Approval must occur on an authorized issuer.'
