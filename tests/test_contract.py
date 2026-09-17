@@ -29,3 +29,14 @@ def test_bootstrap_does_not_claim_activation_or_issuer_authority():
     assert "ACTIVE_NODE" not in BOOT
     assert "ENROLLMENT_ISSUER" not in BOOT
     assert "PENDING - HUMAN/ISSUER APPROVAL REQUIRED" in BOOT
+
+
+def test_bootstrap_supports_explicit_noninteractive_admin_mode():
+    assert "VIVEKA_BOOTSTRAP_NONINTERACTIVE" in LAUNCH
+    assert "VIVEKA_BOOTSTRAP_NONINTERACTIVE" in BOOT
+    assert "-NonInteractive" in LAUNCH
+    assert "if ($env:VIVEKA_BOOTSTRAP_NONINTERACTIVE -ne '1')" in BOOT
+
+
+def test_default_launcher_still_preserves_uac_path():
+    assert "-Verb RunAs" in LAUNCH

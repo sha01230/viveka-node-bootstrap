@@ -171,7 +171,7 @@ try {
   Write-Host ('Log: ' + $LogOut)
   Write-Host 'PUBLIC DOWNLOAD != ENROLLMENT != ACTIVATION != CAPABILITY ATTESTATION'
   if ($TranscriptStarted) { Stop-Transcript | Out-Null; $TranscriptStarted=$false }
-  Read-Host 'VIVEKA NODE PREPARED. Press Enter to close'
+  if ($env:VIVEKA_BOOTSTRAP_NONINTERACTIVE -ne '1') { Read-Host 'VIVEKA NODE PREPARED. Press Enter to close' }
 }catch {
   $message = $_.Exception.Message
   $failure = [ordered]@{
@@ -193,6 +193,6 @@ try {
   Write-Host ('Failure receipt: ' + $FailureReceipt)
   Write-Host ('Log: ' + $LogOut)
   if ($TranscriptStarted) { try { Stop-Transcript | Out-Null } catch { }; $TranscriptStarted=$false }
-  Read-Host 'Bootstrap failed. Press Enter to close'
+  if ($env:VIVEKA_BOOTSTRAP_NONINTERACTIVE -ne '1') { Read-Host 'Bootstrap failed. Press Enter to close' }
   exit 1
 }
